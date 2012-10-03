@@ -13,8 +13,40 @@ function Promise(stream) {
         , reason
         , value
 
+    capture()
+
     return {
         then: then
+    }
+
+    function capture(fulfilledCallback, rejectedCallback) {
+        stream.once("error", cleanup)
+
+        var fulfillStream = stream.pipe(toArray(finished))
+
+        function cleanup(err) {
+            state = PromiseState.REJECTED
+
+            stream.unpipe(fulfillStream)
+
+            reason = err
+
+            if (rejectedCallback) {
+                rejectedCallback(err)
+            }
+        }
+
+        function finished(list) {
+            state = PromiseState.FULFILLED
+
+            stream.removeListener("error", cleanup)
+
+            value = list[0]
+
+            if (fulfilledCallback) {
+                fulfilledCallback(value)
+            }
+        }
     }
 
     function then(fulfilledCallback, rejectedCallback) {
@@ -23,17 +55,14 @@ function Promise(stream) {
             return handleSync(fulfilledCallback, rejectedCallback)
         }
 
-        var fulfillStream
+        capture(handleFulfilled, handleRejected)
 
-        // Rejection is simply listening on errors
-        if (rejectedCallback) {
-            // Promises suck. No way to send multiple errors
-            stream.once("error", cleanup)
+        function handleFulfilled(value) {
+            resolve(value, fulfilledCallback)
         }
 
-        // Fullfillment is simply waiting for the stream to end with data
-        if (fulfilledCallback) {
-            fulfillStream = stream.pipe(toArray(finished))
+        function handleRejected(err) {
+            resolve(err, rejectedCallback)
         }
 
         // What? Promises return promises? >_<
@@ -41,43 +70,14 @@ function Promise(stream) {
 
         return Promise(returnedQueue.stream)
 
-        function cleanup(err) {
-            state = PromiseState.REJECTED
-            // If rejected then kill fulfillment handler
-            if (fulfillStream) {
-                stream.unpipe(fulfillStream)
+        function resolve(item, callback) {
+            if (!callback) {
+                return
             }
-
-            reason = err
 
             try {
-                var result = rejectedCallback(err)
+                var result = callback(item)
 
-                // Fullfill the returned promise with the result
-                // Only one value >_<.
-                // Y U NO STREAM INFINITE MANY VALUES
-                returnedQueue.push(result)
-                returnedQueue.end()
-            } catch (err) {
-                returnedQueue.error(err)
-            }
-        }
-
-        function finished(list) {
-            state = PromiseState.FULFILLED
-            // If fulfilled do not allow rejection to be called
-            if (rejectedCallback) {
-                stream.removeListener("error", cleanup)
-            }
-
-            value = list[0]
-
-            try {
-                var result = fulfilledCallback(value)
-
-                // Fullfill the returned promise with the result
-                // Only one value >_<
-                // Y U NO STREAM INFINITE MANY VALUES
                 returnedQueue.push(result)
                 returnedQueue.end()
             } catch (err) {

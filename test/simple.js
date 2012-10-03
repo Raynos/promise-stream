@@ -13,6 +13,7 @@ promise
 })
 .then(
     function (x) {
+        console.log("result", x)
         assert(x === "second", "should transform fulfillment values");
     },
     function (e) {

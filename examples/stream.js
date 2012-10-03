@@ -1,41 +1,30 @@
 var ReadWriteStream = require("read-write-stream")
     , assert = require("assert")
+    , Domain = require("domain")
 
-var one = ReadWriteStream()
-    , two = ReadWriteStream(function write(chunk, queue) {
-        console.log("one", chunk)
-        queue.push("two")
-    })
-    , three = ReadWriteStream(function write(chunk, queue) {
-        console.log("two", chunk)
-        queue.error("three")
-    })
-    , four = ReadWriteStream()
+var domain = Domain.create()
 
-connect([
-    one.stream
-    , two.stream
-    , three.stream
-    , four.stream
-]).on("error", function (e) {
-    console.log("three", e)
-})
-
-// Flow data through one's queu
-one.end("one")
-
-// Helper to emulate error propagation functionality
-function connect(streams) {
-    for (var i = 0; i < streams.length - 1; i++) {
-        var curr = streams[i]
-            , next = streams[i + 1]
-
-        curr.pipe(next)
-
-        curr.on("error", function (err) {
-            next.emit("error", err)
+domain.run(function () {
+    var one = ReadWriteStream()
+        , two = ReadWriteStream(function write(chunk, queue) {
+            console.log("one", chunk)
+            queue.push("two")
         })
-    }
+        , three = ReadWriteStream(function write(chunk, queue) {
+            console.log("two", chunk)
+            queue.error("three")
+        })
+        , four = ReadWriteStream()
 
-    return next
-}
+    one.stream
+        .pipe(two.stream)
+        .pipe(three.stream)
+        .pipe(four.stream)
+
+    domain.on("error", function (err) {
+        console.log("three", err)
+    })
+
+    // Flow data through one's queu
+    one.end("one")
+})

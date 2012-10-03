@@ -70,10 +70,10 @@ function Promise(stream) {
                 stream.removeListener("error", cleanup)
             }
 
-            value = list
+            value = list[0]
 
             try {
-                var result = fulfilledCallback(list)
+                var result = fulfilledCallback(value)
 
                 // Fullfill the returned promise with the result
                 // Only one value >_<

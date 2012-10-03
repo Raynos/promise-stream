@@ -1,6 +1,6 @@
 {
   "name": "promise-stream",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "A Promises/A implementation based on streams",
   "keywords": [],
   "author": "Raynos <raynos2@gmail.com>",
